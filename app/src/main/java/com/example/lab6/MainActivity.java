@@ -9,7 +9,10 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -18,12 +21,21 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.io.Serializable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
     private SQLiteDatabase db;
-
     private final String CHANNEL_ID = "my_id";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,75 +56,39 @@ public class MainActivity extends AppCompatActivity {
                 ");");
     }
 
-    public void showNotifications(View view) {
+    @Override
+    protected void onStart() {
+        super.onStart();
+        findViewById(R.id.create).setOnClickListener(v -> {
+            Intent intent = new Intent(this, MainNotification.class);
+            startActivity(intent);
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        fillNotifications(findViewById(R.id.reminderListView));
+    }
+
+    public void fillNotifications(RecyclerView reminderList) {
         try {
             Cursor query = db.rawQuery("SELECT _id, title, text, notify_at FROM Notification;", null);
-            StringBuilder result = new StringBuilder("ID, Title, Text, Created At\n");
+            ArrayList<NotificationItem> itemsList = new ArrayList<>();
             while (query.moveToNext()) {
-                result.append(query.getString(0)).append(", ")
-                        .append(query.getString(1)).append(", ")
-                        .append(query.getString(2)).append(", ")
-                        .append(query.getString(3)).append("\n");
+                itemsList.add(new NotificationItem(
+                        query.getLong(0),
+                        query.getString(1),
+                        query.getString(2),
+                        query.getString(3)
+                ));
             }
             query.close();
 
-            Intent intent = new Intent(this, MainActivity2.class);
-            intent.putExtra("data", result.toString());
-            startActivity(intent);
+            NotificationItemAdapter adapter = new NotificationItemAdapter(this, itemsList);
+            reminderList.setAdapter(adapter);
         } catch (Exception e) {
             Toast.makeText(this, e.toString(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void createNotification(View view) {
-        try {
-            ContentValues values = new ContentValues();
-            values.put("title", "");
-            values.put("text", "");
-            values.put("notify_at", "");
-            long id = db.insert("Notification", null, values);
-
-
-            Intent intent = new Intent(this, Notification.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            intent.putExtra("id", id);
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
-
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.notification_icon)
-                    .setContentTitle(textTitle)
-                    .setContentText(textContent)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .setContentIntent(pendingIntent);
-
-            // TODO notify
-
-        } catch (Exception e) {
-            Toast.makeText(this, e.toString(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void deleteNotification(View view) {
-        try {
-            db.execSQL("DELETE FROM Notification WHERE _id = ?",new Object[]{
-
-            });
-        } catch (Exception e) {
-            Toast.makeText(this, e.toString(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void createNotificationChannel() {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is not in the Support Library.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "my_name", importance);
-            channel.setDescription("my_description");
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this.
-            NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
         }
     }
 }
