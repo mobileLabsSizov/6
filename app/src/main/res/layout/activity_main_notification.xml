@@ -48,5 +48,13 @@
         android:textSize="16sp"
         android:text="Сохранить" />
 
+    <Button
+        android:id="@+id/delete"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="50dp"
+        android:textSize="16sp"
+        android:text="Удалить" />
+
 </LinearLayout>
 

@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
@@ -17,6 +18,7 @@ import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -47,7 +49,13 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        db = getBaseContext().openOrCreateDatabase("app.db", MODE_PRIVATE, null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1);
+            }
+        }
+
+            db = getBaseContext().openOrCreateDatabase("app.db", MODE_PRIVATE, null);
         db.execSQL("CREATE TABLE IF NOT EXISTS Notification (" +
                 "_id INTEGER PRIMARY KEY AUTOINCREMENT ," +
                 "title TEXT NOT NULL," +

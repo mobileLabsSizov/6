@@ -1,11 +1,14 @@
 package com.example.lab6;
 
+import android.annotation.SuppressLint;
+import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -13,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,11 +39,9 @@ public class MainNotification extends AppCompatActivity {
     private Long id;
     private SQLiteDatabase db;
 
-    private NotificationManager notificationManager;
-
     private final String CHANNEL_ID = "my_id";
 
-    final SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-ddTHH:mm:ss", Locale.getDefault());
+    private AlarmManager alarm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,16 +56,27 @@ public class MainNotification extends AppCompatActivity {
 
         try {
             id = getIntent().getExtras().getLong("id");
+            findViewById(R.id.delete).setOnClickListener(v -> {
+                try {
+                    db.execSQL("DELETE FROM Notification WHERE _id = ?", new Object[]{id});
+
+                    Intent intent = new Intent(this, MyReceiver.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast
+                            (this, id.intValue(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+
+                    alarm.cancel(pendingIntent);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                this.finish();
+            });
         } catch (Exception ignored) {
+            findViewById(R.id.delete).setVisibility(View.GONE);
         }
 
         db = getBaseContext().openOrCreateDatabase("app.db", MODE_PRIVATE, null);
-        db.execSQL("CREATE TABLE IF NOT EXISTS Notification (" +
-                "_id INTEGER PRIMARY KEY AUTOINCREMENT ," +
-                "title TEXT NOT NULL," +
-                "text TEXT," +
-                "notify_at TIMESTAMP NOT NULL" +
-                ");");
 
         createNotificationChannel();
     }
@@ -81,40 +94,37 @@ public class MainNotification extends AppCompatActivity {
         findViewById(R.id.save).setOnClickListener(v -> {
             try {
                 if (id == null) {
+                    SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+
                     ContentValues cv = new ContentValues();
-                    cv.put("title", (String) ((TextView) findViewById(R.id.title)).getText());
-                    cv.put("text", (String) ((TextView) findViewById(R.id.description)).getText());
-                    cv.put("notify_at", parser.format(givenTimestamp));
+                    cv.put("title", ((EditText) findViewById(R.id.title)).getText().toString());
+                    cv.put("text", ((EditText) findViewById(R.id.description)).getText().toString());
+                    cv.put("notify_at", parser.format(givenTimestamp.getTimeInMillis()));
 
                     id = db.insert("Notification", null, cv);
                 } else {
-                    db.execSQL("UPDATE Notification SET title = ?, text = ?, notify_at = ? WHERE _id = ?", new Object[]{
-                            ((TextView) findViewById(R.id.title)).getText(),
-                            ((TextView) findViewById(R.id.description)).getText(),
+                    db.execSQL("UPDATE Notification SET title = ?, text = ?, notify_at = datetime(?, 'localtime') WHERE _id = ?", new Object[]{
+                            ((EditText) findViewById(R.id.title)).getText().toString(),
+                            ((EditText) findViewById(R.id.description)).getText().toString(),
                             new Timestamp(givenTimestamp.getTimeInMillis()),
                             id
                     });
                 }
 
-                Intent intent = new Intent(this, MainNotification.class);
+                Intent intent = new Intent(this, MyReceiver.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 intent.putExtra("id", id);
-                PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
+                intent.putExtra("title", ((TextView) findViewById(R.id.title)).getText().toString());
+                intent.putExtra("text", ((TextView) findViewById(R.id.description)).getText().toString());
+                PendingIntent pendingIntent = PendingIntent.getBroadcast
+                        (this, id.intValue(), intent, PendingIntent.FLAG_MUTABLE);
 
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle(((TextView) findViewById(R.id.title)).getText())
-                        .setContentText(((TextView) findViewById(R.id.description)).getText())
-                        .setSmallIcon(R.drawable.notification_icon)
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                        .setAutoCancel(true)
-                        .setWhen(givenTimestamp.getTimeInMillis())
-                        .setContentIntent(pendingIntent);
+                alarm.set(AlarmManager.RTC_WAKEUP, givenTimestamp.getTimeInMillis(), pendingIntent);
 
-                notificationManager.notify(id.intValue(), builder.build());
             } catch (Exception e) {
                 Toast.makeText(this, e.toString(), Toast.LENGTH_LONG).show();
             }
-            onDestroy();
+            this.finish();
         });
     }
 
@@ -133,6 +143,7 @@ public class MainNotification extends AppCompatActivity {
                 ((TextView) findViewById(R.id.title)).setText(query.getString(0));
                 ((TextView) findViewById(R.id.description)).setText(query.getString(1));
 
+                SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                 givenTimestamp.setTime(parser.parse(query.getString(2)));
 
                 query.close();
@@ -193,13 +204,12 @@ public class MainNotification extends AppCompatActivity {
         // Create the NotificationChannel, but only on API 26+ because
         // the NotificationChannel class is not in the Support Library.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "my_name", importance);
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_ID, NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("my_description");
             // Register the channel with the system; you can't change the importance
             // or other notification behaviors after this.
-            notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
+            getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         }
     }
 }
