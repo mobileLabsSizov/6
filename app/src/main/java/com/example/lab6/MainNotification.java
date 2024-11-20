@@ -92,20 +92,24 @@ public class MainNotification extends AppCompatActivity {
         });
 
         findViewById(R.id.save).setOnClickListener(v -> {
+
+            String title = ((EditText) findViewById(R.id.title)).getText().toString();
+            String text = ((EditText) findViewById(R.id.description)).getText().toString();
+
             try {
                 if (id == null) {
                     SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
 
                     ContentValues cv = new ContentValues();
-                    cv.put("title", ((EditText) findViewById(R.id.title)).getText().toString());
-                    cv.put("text", ((EditText) findViewById(R.id.description)).getText().toString());
+                    cv.put("title", title);
+                    cv.put("text", text);
                     cv.put("notify_at", parser.format(givenTimestamp.getTimeInMillis()));
 
                     id = db.insert("Notification", null, cv);
                 } else {
                     db.execSQL("UPDATE Notification SET title = ?, text = ?, notify_at = datetime(?, 'localtime') WHERE _id = ?", new Object[]{
-                            ((EditText) findViewById(R.id.title)).getText().toString(),
-                            ((EditText) findViewById(R.id.description)).getText().toString(),
+                            title,
+                            text,
                             new Timestamp(givenTimestamp.getTimeInMillis()),
                             id
                     });
@@ -114,10 +118,10 @@ public class MainNotification extends AppCompatActivity {
                 Intent intent = new Intent(this, MyReceiver.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 intent.putExtra("id", id);
-                intent.putExtra("title", ((TextView) findViewById(R.id.title)).getText().toString());
-                intent.putExtra("text", ((TextView) findViewById(R.id.description)).getText().toString());
+                intent.putExtra("title", title);
+                intent.putExtra("text", text);
                 PendingIntent pendingIntent = PendingIntent.getBroadcast
-                        (this, id.intValue(), intent, PendingIntent.FLAG_MUTABLE);
+                        (this, id.intValue(), intent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
                 alarm.set(AlarmManager.RTC_WAKEUP, givenTimestamp.getTimeInMillis(), pendingIntent);
 

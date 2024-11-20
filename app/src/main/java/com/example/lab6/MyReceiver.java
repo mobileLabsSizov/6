@@ -19,12 +19,12 @@ public class MyReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         try {
         Bundle b = intent.getExtras();
-        int id = (int) b.getLong("id");
+        long id = b.getLong("id");
 
             Intent activity = new Intent(context, MainNotification.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            intent.putExtra("id", id);
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, id, activity, PendingIntent.FLAG_IMMUTABLE);
+            activity.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity.putExtra("id", id);
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, (int) id, activity, PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(b.getString("title"))
@@ -38,7 +38,7 @@ public class MyReceiver extends BroadcastReceiver {
                 builder.setChannelId(CHANNEL_ID);
             }
 
-            context.getSystemService(NotificationManager.class).notify(id, builder.build());
+            context.getSystemService(NotificationManager.class).notify((int) id, builder.build());
         } catch (Exception e) {
             e.printStackTrace();
         }
